@@ -84,6 +84,7 @@ class RSICDDataset(Dataset):
 
     def __getitem__(self, idx):
         filename, caption = self.pairs[idx]
+        clean_name=os.path.basename(filename)
         img_path = os.path.join(self.image_dir, filename)
 
         image = Image.open(img_path).convert("RGB")
