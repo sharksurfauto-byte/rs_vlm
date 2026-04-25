@@ -8,18 +8,17 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # EuroSAT class names — used to build VQA templates later
 EUROSAT_CLASSES = [
-    "annual crop",
-    "forest",
-    "herbaceous vegetation",
-    "highway",
-    "industrial area",
-    "pasture",
-    "permanent crop",
-    "residential area",
-    "river",
-    "sea or lake",
+    "Annual Crop",
+    "Forest",
+    "Herbaceous Vegetation",
+    "Highway",
+    "Industrial Buildings",
+    "Pasture",
+    "Permanent Crop",
+    "Residential Buildings",
+    "River",
+    "SeaLake",
 ]
-
 
 def get_eurosat_transforms(train: bool = True) -> transforms.Compose:
     """
