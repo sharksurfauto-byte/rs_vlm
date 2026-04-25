@@ -1,0 +1,57 @@
+# Inherits base_config.yaml — only overrides T4-unsafe values
+
+# ── Model ────────────────────────────────────────────
+model:
+  llm_name: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+  encoder_dim: 384
+  llm_dim: 2048
+  cnn_pretrained: true
+  use_lora: true
+  lora_r: 8
+
+# ── Encoder ──────────────────────────────────────────
+encoder:
+  num_blocks: 4
+  num_heads: 6
+  mlp_ratio: 4.0
+  dropout: 0.1
+
+# ── Data ─────────────────────────────────────────────
+data:
+  eurosat_root: "/content/rs_vlm/data/EuroSAT"
+  rsicd_root: "/content/rs_vlm/data/RSICD"
+  gsd: 10.0
+  num_workers: 2          # Colab has limited CPU cores
+  train_split: 0.8
+
+# ── Phase 1 — MAE pretraining ─────────────────────────
+phase1:
+  epochs: 30
+  batch_size: 16          # 64 OOMs on T4
+  lr: 1.5e-4
+  weight_decay: 0.05
+  mask_ratio: 0.75
+  warmup_epochs: 5
+  save_every: 5
+  checkpoint_dir: "/content/drive/MyDrive/rs_vlm/checkpoints/phase1"
+
+# ── Phase 2 — Projector alignment ────────────────────
+phase2:
+  epochs: 10
+  batch_size: 8           # 32 OOMs on T4
+  lr: 1e-4
+  weight_decay: 0.01
+  warmup_epochs: 2
+  save_every: 2
+  checkpoint_dir: "/content/drive/MyDrive/rs_vlm/checkpoints/phase2"
+
+# ── Phase 3 — LoRA instruction tuning ────────────────
+phase3:
+  epochs: 10
+  batch_size: 4           # 16 OOMs on T4
+  lr: 2e-4
+  weight_decay: 0.01
+  max_length: 64
+  warmup_epochs: 2
+  save_every: 2
+  checkpoint_dir: "/content/drive/MyDrive/rs_vlm/checkpoints/phase3"
