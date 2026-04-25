@@ -31,7 +31,7 @@ class RSVLM(nn.Module):
             llm_dim=2048,
             cnn_pretrained=True,
             use_lora=True,
-            lora_r=8
+            lora_r=8,
     ):
         super().__init__()
 
