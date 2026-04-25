@@ -16,7 +16,7 @@ def save_checkpoint(
     epoch: int,
     loss: float,
     checkpoint_dir: str,
-    filename: str = None,
+    filename: str | None = None,
 ):
     """Save model + optimizer state to disk."""
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
