@@ -18,8 +18,8 @@ encoder:
 
 # ── Data ─────────────────────────────────────────────
 data:
-  eurosat_root: "/content/rs_vlm/data/EuroSAT"
-  rsicd_root: "/content/rs_vlm/data/RSICD"
+  eurosat_root: "/content/drive/MyDrive/rs_vlm_data/EuroSAT data"
+  rsicd_root: "/content/drive/MyDrive/rs_vlm_data/RSICD data"
   gsd: 10.0
   num_workers: 2          # Colab has limited CPU cores
   train_split: 0.8
