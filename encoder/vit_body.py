@@ -71,7 +71,7 @@ class ViTBody(nn.Module):
         #learnable CLS token
         self.cls_token=nn.Parameter(torch.zeros(1,1,embed_dim))
         #pos embedding: 784 pathc tokens +1 cls token
-        self.pos_embed=nn.Parameter(torch.zeros(1,785,embed_dim))  #why 785? 784+1cls token
+        self.pos_embed=nn.Parameter(torch.zeros(1,197,embed_dim))  #why 197? 196+1cls token
 
         self.blocks=nn.ModuleList(
             [ViTBlock(embed_dim,num_heads,mlp_ratio,dropout) 

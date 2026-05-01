@@ -31,6 +31,7 @@ class CNNStem(nn.Module):
             resnet.layer2,  # type: ignore      #56->28 (stride=2)
             resnet.layer3,  # type: ignore      #28->28 
         )
+        self.pool = nn.AvgPool2d(kernel_size=2, stride=2)  # 28x28 → 14x14
         for module in self.stem[-1].modules():
             if isinstance(module, nn.Conv2d) and module.stride == (2, 2):
                 module.stride = (1, 1)
@@ -51,7 +52,7 @@ class CNNStem(nn.Module):
     def forward(self,x:torch.Tensor) -> torch.Tensor:
         # x shape: [B,3,H,W]
         #feature map shape: [B,256,H/8,W/8]
-        return self.stem(x)
+        return self.pool(self.stem(x))
     
 # if __name__ == "__main__":
 #     #test the cnn stem
