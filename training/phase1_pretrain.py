@@ -82,7 +82,7 @@ def train_phase1(config_path:str = "configs/colab_config.yaml",
 
     #only enc and dec are trainable in p1
     params= list(encoder.parameters()) + list(decoder.parameters())
-    optimizer = torch.optim.AdamW(params, lr=p1["lr"], weight_decay=p1["weight_decay"])
+    optimizer = torch.optim.AdamW(params, lr=float(p1["lr"]), weight_decay=float(p1["weight_decay"]))
 
     scheduler = get_warmup_scheduler(optimizer, p1["warmup_epochs"], p1["epochs"])
     
