@@ -35,6 +35,12 @@ def train_phase2(
         model.encoder.load_state_dict(ckpt["model_state_dict"])
         print(f"Loaded Phase 1 checkpoint: {phase1_checkpoint}")
 
+    # gradient checkpointing on LLM — critical for T4
+    # gradients flow THROUGH the frozen LLM back to the projector, so without this
+    # all 22 layer activations stay in VRAM → OOM. checkpointing recomputes them during backward
+    model.llm.gradient_checkpointing_enable()
+    print("Gradient checkpointing enabled on LLM")
+
     # freeze CNN stem + ViT body but keep GSDAdapter trainable
     model.freeze_encoder_expect_gsd()
     for param in model.llm.parameters():
@@ -42,7 +48,7 @@ def train_phase2(
 
     model.unfreeze_projector()
     trainable=sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"trainable params: {trainable:,} (projector only)")
+    print(f"Trainable params: {trainable:,} (projector only)")
 
     optimizer = torch.optim.AdamW(
         filter(lambda p: p.requires_grad, model.parameters()),
