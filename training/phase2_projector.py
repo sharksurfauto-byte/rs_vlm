@@ -52,8 +52,8 @@ def train_phase2(
 
     optimizer = torch.optim.AdamW(
         filter(lambda p: p.requires_grad, model.parameters()),
-        lr=p2["lr"],
-        weight_decay=p2["weight_decay"]
+        lr=float(p2["lr"]),                    # cast — yaml.dump can serialize 1e-4 as a string
+        weight_decay=float(p2["weight_decay"])
     )
 
     scheduler=get_warmup_scheduler(
