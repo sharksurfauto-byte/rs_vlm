@@ -33,9 +33,12 @@ class CNNStem(nn.Module):
         )
         for module in self.stem[-1].modules():
             if isinstance(module, nn.Conv2d) and module.stride == (2, 2):
-                module.stride=(1,1)
-                module.dilation=(2,2)
-                module.padding=(2,2)
+                module.stride = (1, 1)
+                if module.kernel_size[0] > 1:
+                    # dilated conv to preserve receptive field without downsampling
+                    # only for 3x3 convs — the 1x1 downsample shortcut just needs stride=1
+                    module.dilation = (2, 2)
+                    module.padding = (2, 2)
 
         # self.out_channels=256 #layer 3 outputs channels in Resnet-18
 
