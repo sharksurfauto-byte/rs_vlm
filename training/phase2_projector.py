@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,13 +11,13 @@ from training.trainer_utils import (
 )
 
 def train_phase2(
-        config_path = "config/colab_config.yaml",
+        config_path = "configs/colab_config.yaml",  # fixed: was "config/" (missing s)
         phase1_checkpoint:str|None=None,
         resume_from:str|None=None,
 ):
     cfg=load_config(config_path)
     p2=cfg["phase2"]
-    device=torch.device('cpu')
+    device = get_device()  # fixed: was hardcoded torch.device('cpu') — would skip GPU on Colab
 
     #model
     model=RSVLM(
@@ -36,8 +35,8 @@ def train_phase2(
         model.encoder.load_state_dict(ckpt["model_state_dict"])
         print(f"Loaded Phase 1 checkpoint: {phase1_checkpoint}")
 
-    #freeze encoder and llm, only train proj
-    model.freeze_encoder()
+    # freeze CNN stem + ViT body but keep GSDAdapter trainable
+    model.freeze_encoder_expect_gsd()
     for param in model.llm.parameters():
         param.requires_grad=False
 
@@ -85,10 +84,9 @@ def train_phase2(
             gsd=batch["gsd"].to(device) #[B]
             captions=batch["caption"]
 
-            #tokenize captions
             encoded=model.tokenizer(
                 captions,
-                return_tensor="pt",
+                return_tensors="pt",  # fixed: was return_tensor (missing s) — would crash on .to(device)
                 padding=True,
                 truncation=True,
                 max_length=64,
@@ -141,7 +139,7 @@ if __name__ == "__main__":
     device = get_device()
 
     model = RSVLM(cnn_pretrained=False).to(device)
-    model.freeze_encoder()
+    model.freeze_encoder_expect_gsd()  # keep GSDAdapter trainable
     for param in model.llm.parameters():
         param.requires_grad = False
     model.unfreeze_projector()

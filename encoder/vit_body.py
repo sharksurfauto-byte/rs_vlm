@@ -12,13 +12,13 @@ class PatchEmbedFromFeatureMap(nn.Module):
         #linear proj from CNN channel dim to ViT embed dim
         self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=1)
 
-    def forward(self,x:torch.Tensor) -> tuple[torch.Tensor,int,int]:
+    def forward(self,x:torch.Tensor) -> torch.Tensor:
         # x shape: [B,256,28,28]
         x = self.proj(x) #[b,384,28,28]
         B,C,H,W = x.shape
         x=x.flatten(2) #[b,384,784]
         x=x.transpose(1,2) #[b,784,384]
-        return x,H,W
+        return x  # H,W dropped — caller doesn't use them
     
 class ViTBlock(nn.Module):
     """
@@ -42,12 +42,12 @@ class ViTBlock(nn.Module):
         )
 
     def forward(self,x:torch.Tensor) -> torch.Tensor:
-        # self attn with residual
-        normed=self.norm1(x)
-        attn_out,_=self.attn(normed, normed, normed)
-        x = self.norm2(x)
-        #MLP with residual
-        x = x + self.mlp(x)
+        # attention sub-layer (Pre-LN): norm → attn → residual
+        normed1 = self.norm1(x)
+        attn_out, _ = self.attn(normed1, normed1, normed1)
+        x = x + attn_out  # residual add (was missing — attn_out was being discarded)
+        # MLP sub-layer (Pre-LN): norm → mlp → residual
+        x = x + self.mlp(self.norm2(x))
         return x
     
 class ViTBody(nn.Module):
@@ -87,27 +87,32 @@ class ViTBody(nn.Module):
         nn.init.trunc_normal_(self.cls_token,std=0.02)
         nn.init.trunc_normal_(self.pos_embed,std=0.02)
     
-    def forward(self, feature_map:torch.Tensor) -> torch.Tensor:
-        # feature map shape: [B,256,28,28]
-        #output tokens shape: [B,785,384] #cls + patch tokens
+    def forward(self, feature_map:torch.Tensor, gsd_bias:torch.Tensor|None=None) -> torch.Tensor:
+        #feat_map : [B, 256, 28, 28]
+        #gsd_bias    : [B, 1, 384]  optional scale-aware bias from GSDAdapter
+        #outpu shapet      : [B, 785, 384]  CLS + patch tokens
+        B = feature_map.shape[0]
 
-        B=feature_map.shape[0]
-        #embed the patches
-        x,H,W=self.patch_embed(feature_map) #[B,784,384]
+        # embed patches
+        x = self.patch_embed(feature_map)       # [B, 784, 384]
 
-        #prepenf CLS token
-        cls=self.cls_token.expand(B,-1,-1) #[B,1,384]
-        x=torch.cat((cls,x),dim=1) #[B,785,384]
+        # prepend CLS token
+        cls = self.cls_token.expand(B, -1, -1)  # [B, 1, 384]
+        x = torch.cat((cls, x), dim=1)          # [B, 785, 384]
 
-        #add pos embed
-        x = x + self.pos_embed #[B,785,384]
+        # build positional encoding — clone so we never mutate the stored Parameter
+        # gsd_bias is added only to patch tokens ([:,1:,:]), not the CLS token
+        pos = self.pos_embed.expand(B, -1, -1).clone()  # [B, 785, 384]
+        if gsd_bias is not None:
+            pos[:, 1:, :] = pos[:, 1:, :] + gsd_bias   # [B, 784, 384] — scale-aware
+        x = x + pos
 
-        #transformer blocks
+        # transformer blocks
         for block in self.blocks:
-            x=block(x) #[B,785,384]
-        x = self.norm(x) 
+            x = block(x)                        # [B, 785, 384]
+        x = self.norm(x)
 
-        return x 
+        return x
     
 #testing thie ViT body
 # if __name__ == "__main__":

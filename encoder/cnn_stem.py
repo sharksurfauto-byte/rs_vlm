@@ -33,9 +33,16 @@ class CNNStem(nn.Module):
         )
         for module in self.stem[-1].modules():
             if isinstance(module, nn.Conv2d) and module.stride == (2, 2):
-                module.stride = (1, 1)
+                module.stride=(1,1)
+                module.dilation=(2,2)
+                module.padding=(2,2)
 
-        self.out_channels=256 #layer 3 outputs channels in Resnet-18
+        # self.out_channels=256 #layer 3 outputs channels in Resnet-18
+
+        # instead of hardcoding thhe output_channels directly, we use a more dynamic approach for it
+        with torch.no_grad():
+            dummy=torch.zeros(1,3,224,224) #dummy tensor of an image
+            self.out_channels=self.stem(dummy).shape[1]
 
         if frozen:
             for param in self.stem.parameters():

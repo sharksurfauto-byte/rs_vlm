@@ -16,7 +16,7 @@ def get_lora_config(
             "q_proj",
             "k_proj",
             "v_proj",
-            "dense"
+            "o_proj"
         ],
         inference_mode=False
     )

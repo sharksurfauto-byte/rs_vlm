@@ -66,13 +66,8 @@ class HybridEncoder(nn.Module):
         #stage2: gsd adapter produces scale aware pos bias
         gsd_bias=self.gsd_adapter(gsd) #[B,1,384]
 
-        #stage3: vit body: inject GSD bias into pos embeds
-        original_pos_embed=self.vit_body.pos_embed #[1,785,384]
-        self.vit_body.pos_embed=nn.Parameter(
-            original_pos_embed + gsd_bias # [B,785,384]
-        )
-
-        tokens=self.vit_body(feature_map) #[B,785,384]
+        #stage3: vit body — pass gsd_bias as argument, no Parameter mutation
+        tokens = self.vit_body(feature_map, gsd_bias=gsd_bias)  #[B,785,384]
         return tokens
     
     def get_param_count(self):

@@ -14,9 +14,11 @@ class MLPProjector(nn.Module):
     def __init__(self, 
                  enc_dim:int=384, 
                  llm_dim:int=2048, 
-                 hidden_dim:int=1024, 
+                 hidden_dim:int|None=None,  # defaults to geometric mean of enc/llm dims
                  dropout:float=0.1):
         super().__init__()
+        if hidden_dim is None:
+            hidden_dim = int((enc_dim * llm_dim) ** 0.5)  # ~885 for 384->2048, close to 1024
 
         self.mlp=nn.Sequential(
             nn.Linear(enc_dim,hidden_dim),
@@ -42,8 +44,9 @@ class MLPProjector(nn.Module):
         return x
     
     def get_param_count(self):
-        total=sum(p.numel() for p in self.parameters())
-        return total
+        total = sum(p.numel() for p in self.parameters())
+        trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        return total, trainable
     
 #testing the MLP projector
 if __name__ == "__main__":

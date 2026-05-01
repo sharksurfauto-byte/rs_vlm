@@ -86,6 +86,14 @@ class RSVLM(nn.Module):
         for param in self.projector.parameters():
             param.requires_grad = True
 
+    def freeze_encoder_expect_gsd(self):
+        #freeze CNN stem
+        for param in self.encoder.cnn_stem.parameters():
+            param.requires_grad=False
+        #freeze vit body
+        for param in self.encoder.vit_body.parameters():
+            param.requires_grad=False
+
     def forward(
             self,
             images,
@@ -106,8 +114,6 @@ class RSVLM(nn.Module):
             loss if labels are provided else returns the logits
         """
 
-        B = images.shape[0]
-
         #step1: encode the image into vsual tokens
         visual_tokens=self.encoder(images, gsd) #[b,785,384]
         visual_tokens=self.projector(visual_tokens) #[b,785,2048]
@@ -120,13 +126,13 @@ class RSVLM(nn.Module):
         input_embeds=torch.cat([visual_tokens, text_embeds], dim=1) #[b, 785+seqw_len, 2048]
 
         #step4: extend the attn mask to cover visual tokens
-        visual_mask=torch.ones(B, visual_tokens.shape[1], device=attention_mask.device)
+        visual_mask=torch.ones(images.shape[0], visual_tokens.shape[1], device=attention_mask.device)
         full_mask=torch.cat([visual_mask, attention_mask], dim=1)
 
         #step5: extend the labels if provided and mask visual tokens pos with -100
         if labels is not None:
             visual_labels=torch.full(
-                (B, visual_tokens.shape[1]), fill_value=-100, device=labels.device, dtype=labels.dtype
+                (images.shape[0], visual_tokens.shape[1]), fill_value=-100, device=labels.device, dtype=labels.dtype
             )
             labels=torch.cat([visual_labels, labels], dim=1)
 

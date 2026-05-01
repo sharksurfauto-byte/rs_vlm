@@ -68,6 +68,7 @@ class EuroSATDataset(Dataset):
         gsd: float = 10.0,       # Sentinel-2 GSD
     ):
         self.gsd = gsd
+        self.is_train = train  # store separately — self.train() is an nn.Module method
         transform = get_eurosat_transforms(train)
 
         # torchvision ImageFolder handles the class subfolder structure
@@ -91,10 +92,16 @@ class EuroSATDataset(Dataset):
 
     def __getitem__(self, idx):
         image, label = self.dataset[idx] #type: ignore
+
+        # we add a bit of jitter in the gsd value as a satellite image data has a slight GSD variance ...(due to atmospheric effects, orbit)
+        if self.is_train:
+            gsd_val = self.gsd * (1 + 0.05 * torch.randn(1).item())
+        else:
+            gsd_val = self.gsd
         return {
             "image": image,                              # [3, 224, 224]
             "label": torch.tensor(label, dtype=torch.long),
-            "gsd": torch.tensor(self.gsd, dtype=torch.float32),
+            "gsd": torch.tensor(gsd_val, dtype=torch.float32),  # fixed: was self.gsd_val
             "class_name": EUROSAT_CLASSES[label],
         }
 

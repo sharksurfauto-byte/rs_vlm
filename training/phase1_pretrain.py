@@ -6,14 +6,13 @@
 # no labels are needed . this is fully supervised on EuroSAT's 27k imgs
 
 import torch
-import torch.nn as nn
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from encoder.hybrid_encoder import HybridEncoder
 from data.eurosat import get_eurosat_dataloader, mae_mask_patches
-from data.transforms import get_mae_transforms
+# get_mae_transforms not needed here — eurosat dataloader handles its own transforms
 from training.trainer_utils import(
     load_config, save_checkpoint, load_checkpoint,
     get_device, get_warmup_scheduler
@@ -40,7 +39,7 @@ class MAEDecoder(nn.Module):
         B,N,C = reconstructed.shape
         H=W=int(N**0.5) #28
         reconstructed = reconstructed.transpose(1,2).view(B,C,H,W)
-        return reconstructed #[B,3,224,224]
+        return reconstructed #[B,256,28,28]
     
 def mae_loss(
         original,
@@ -68,7 +67,7 @@ def train_phase1(config_path:str = "configs/colab_config.yaml",
     #model
     encoder = HybridEncoder(
         cnn_pretrained=cfg["model"]["cnn_pretrained"],
-        embed_dim=cfg["encoder"]["encoder_dim"] if "encoder_dim" in cfg["encoder"] else cfg["model"]["encoder_dim"],
+        embed_dim=cfg["model"]["encoder_dim"],  # encoder_dim only lives under [model] in the yaml
         num_blocks=cfg["encoder"]["num_blocks"],
         num_heads=cfg["encoder"]["num_heads"],
         mlp_ratio=cfg["encoder"]["mlp_ratio"],
@@ -120,14 +119,9 @@ def train_phase1(config_path:str = "configs/colab_config.yaml",
                 feature_map,
                 mask_ratio=p1["mask_ratio"]
             )
-            #step3: pass masked map through vit body and gsd adapter
-            gsd_bias = encoder.gsd_adapter(gsd) #[B,1,384]
-            original_pos=encoder.vit_body.pos_embed #[1,785,384]
-            encoder.vit_body.pos_embed=nn.Parameter(
-                original_pos + gsd_bias
-            )
-            tokens=encoder.vit_body(masked_map) #[B,785,384]
-            encoder.vit_body.pos_embed=nn.Parameter(original_pos) #reset pos embed to original for next batch
+            #step3: pass masked map through vit body — gsd_bias goes in as an arg now, no param mutation
+            gsd_bias = encoder.gsd_adapter(gsd)                         #[B,1,384]
+            tokens = encoder.vit_body(masked_map, gsd_bias=gsd_bias)    #[B,785,384]
             #step4:: decode and compute the loss oon the masked pathces only
             reconstructed = decoder(tokens) #[B,256,28,28]
             loss=mae_loss(feature_map, reconstructed, mask)
@@ -140,9 +134,7 @@ def train_phase1(config_path:str = "configs/colab_config.yaml",
         scheduler.step()
         avg_loss = epoch_loss/num_batches
 
-        print(f"Epoch [{epoch+1}/{p1['epochs']}]" 
-              f"Loss: {avg_loss:.4f}"
-              f"LR: {scheduler.get_last_lr()[0]:.2e}")
+        print(f"Epoch [{epoch+1}/{p1['epochs']}] | Loss: {avg_loss:.4f} | LR: {scheduler.get_last_lr()[0]:.2e}")
         
         #save checkpoint
         if (epoch+1)%p1["save_every"]==0:
@@ -178,11 +170,8 @@ if __name__ == "__main__":
     feature_map = encoder.cnn_stem(dummy_images)
     masked_map, mask = mae_mask_patches(feature_map, mask_ratio=0.75)
 
-    gsd_bias = encoder.gsd_adapter(dummy_gsd)
-    original_pos = encoder.vit_body.pos_embed
-    encoder.vit_body.pos_embed = nn.Parameter(original_pos + gsd_bias)
-    tokens = encoder.vit_body(masked_map)
-    encoder.vit_body.pos_embed = nn.Parameter(original_pos)
+    gsd_bias = encoder.gsd_adapter(dummy_gsd)                      #[B,1,384]
+    tokens = encoder.vit_body(masked_map, gsd_bias=gsd_bias)        #[B,785,384]
 
     reconstructed = decoder(tokens)
     loss = mae_loss(feature_map.detach(), reconstructed, mask)

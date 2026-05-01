@@ -10,13 +10,15 @@ class GSDAdapter(nn.Module):
     #x shape: [B] - GSD value per img in m/pixel
     #output: [B,1,384] -  bias to add to pos embed
 
-    def __init__(self, embed_dim:int=384, hidden_dim:int = 64):
+    def __init__(self, embed_dim:int=384):
         super().__init__()
-        
+        hidden_dim=embed_dim//6
+
+        #starts with [b,1]
         self.mlp=nn.Sequential(
-            nn.Linear(1,hidden_dim),
+            nn.Linear(1,hidden_dim), #[b,1] -> [b,64]
             nn.GELU(),
-            nn.Linear(hidden_dim,embed_dim)
+            nn.Linear(hidden_dim,embed_dim) #[b,64] -> [b,384]
         )
 
         self._init_weights()
@@ -33,10 +35,10 @@ class GSDAdapter(nn.Module):
         # returns bias shape :[B,1,384] this is added to the pos embeds of the vit
 
         #normalize gsd to a resonabel range
-        gsd=torch.log(gsd).unsqueeze(-1) #[B,1]
+        gsd=torch.log(gsd.clamp(min=1e-3)).unsqueeze(-1) #[B,1]
         bias=self.mlp(gsd) #[B,384]
         bias=bias.unsqueeze(1) #[B,1,384]
-        return bias
+        return bias #now this bias is gonna be added to the pos embeddings..execpt the CLS token
 
 # testing the shapes lol  
 # if __name__ == "__main__":
