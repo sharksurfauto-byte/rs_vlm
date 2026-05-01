@@ -20,7 +20,7 @@ class HybridEncoder(nn.Module):
         gsd:    [B]  — metres/pixel per image (default 10.0 for Sentinel-2)
 
     Output:
-        tokens: [B, 785, 384]  — CLS + 784 patch tokens
+        tokens: [B, 197, 384]  — CLS + 196 patch tokens (14×14 after AvgPool)
     """
 
     def __init__(

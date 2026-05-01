@@ -54,8 +54,8 @@ class ViTBody(nn.Module):
     """
     lightweight ViT body thats opertyed on CNN feat map
     """
-    #x:[B,256,28,28]  input form cnn stem
-    #output shape: [b,784,384] tokens seq for proj
+    #x:[B,256,14,14]  input from cnn stem (after avgpool)
+    #output shape: [b,197,384] tokens seq for proj
 
     def __init__(
             self,
@@ -88,28 +88,28 @@ class ViTBody(nn.Module):
         nn.init.trunc_normal_(self.pos_embed,std=0.02)
     
     def forward(self, feature_map:torch.Tensor, gsd_bias:torch.Tensor|None=None) -> torch.Tensor:
-        #feat_map : [B, 256, 28, 28]
+        #feat_map : [B, 256, 14, 14]
         #gsd_bias    : [B, 1, 384]  optional scale-aware bias from GSDAdapter
-        #outpu shapet      : [B, 785, 384]  CLS + patch tokens
+        #output shape : [B, 197, 384]  CLS + 196 patch tokens
         B = feature_map.shape[0]
 
         # embed patches
-        x = self.patch_embed(feature_map)       # [B, 784, 384]
+        x = self.patch_embed(feature_map)       # [B, 196, 384]
 
         # prepend CLS token
         cls = self.cls_token.expand(B, -1, -1)  # [B, 1, 384]
-        x = torch.cat((cls, x), dim=1)          # [B, 785, 384]
+        x = torch.cat((cls, x), dim=1)          # [B, 197, 384]
 
         # build positional encoding — clone so we never mutate the stored Parameter
         # gsd_bias is added only to patch tokens ([:,1:,:]), not the CLS token
-        pos = self.pos_embed.expand(B, -1, -1).clone()  # [B, 785, 384]
+        pos = self.pos_embed.expand(B, -1, -1).clone()  # [B, 197, 384]
         if gsd_bias is not None:
-            pos[:, 1:, :] = pos[:, 1:, :] + gsd_bias   # [B, 784, 384] — scale-aware
+            pos[:, 1:, :] = pos[:, 1:, :] + gsd_bias   # [B, 196, 384] — scale-aware
         x = x + pos
 
         # transformer blocks
         for block in self.blocks:
-            x = block(x)                        # [B, 785, 384]
+            x = block(x)                        # [B, 197, 384]
         x = self.norm(x)
 
         return x
