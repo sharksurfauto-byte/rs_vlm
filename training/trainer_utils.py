@@ -73,7 +73,7 @@ def get_warmup_scheduler(
     """
     def lr_lambda(epoch):
         if epoch < warmup_epochs:
-            return epoch / max(1, warmup_epochs)
+            return (epoch + 1) / max(1, warmup_epochs)
         # Cosine decay after warmup
         progress = (epoch - warmup_epochs) / max(1, total_epochs - warmup_epochs)
         return 0.5 * (1.0 + torch.cos(torch.tensor(3.14159 * progress)).item())
