@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
     device = get_device()
 
-    model = RSVLM(cnn_pretrained=False).to(device)
+    model = RSVLM(cnn_pretrained=False, use_lora=False).to(device)
     model.freeze_encoder_expect_gsd()  # keep GSDAdapter trainable
     for param in model.llm.parameters():
         param.requires_grad = False

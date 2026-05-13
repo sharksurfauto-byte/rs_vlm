@@ -51,7 +51,7 @@ class RSVLM(nn.Module):
         print(f"loading llm : {llm_name}")
         self.llm=AutoModelForCausalLM.from_pretrained(
             llm_name,
-            torch_dtype=torch.float32
+            torch_dtype=torch.float16
         )
 
         #freeze all llm params
