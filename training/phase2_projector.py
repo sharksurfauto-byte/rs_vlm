@@ -25,7 +25,7 @@ def train_phase2(
         enc_dim=cfg["model"]["encoder_dim"],
         llm_dim=cfg["model"]["llm_dim"],
         cnn_pretrained=cfg["model"]["cnn_pretrained"],
-        use_lora=cfg["model"]["use_lora"],
+        use_lora=False,   # LLM fully frozen in Phase 2, LoRA not needed
         lora_r=cfg["model"]["lora_r"],
     ).to(device)
 
@@ -39,6 +39,7 @@ def train_phase2(
     # gradients flow THROUGH the frozen LLM back to the projector, so without this
     # all 22 layer activations stay in VRAM → OOM. checkpointing recomputes them during backward
     model.llm.gradient_checkpointing_enable()
+    model.llm.config.use_cache = False
     print("Gradient checkpointing enabled on LLM")
 
     # freeze CNN stem + ViT body but keep GSDAdapter trainable
@@ -48,7 +49,7 @@ def train_phase2(
 
     model.unfreeze_projector()
     trainable=sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Trainable params: {trainable:,} (projector only)")
+    print(f"Trainable params: {trainable:,} (projector + gsd adapter)")
 
     optimizer = torch.optim.AdamW(
         filter(lambda p: p.requires_grad, model.parameters()),
@@ -62,11 +63,6 @@ def train_phase2(
         p2["epochs"]
     )
 
-    #ressume
-    start_epoch=0
-    if resume_from:
-        start_epoch,_ = load_checkpoint(model, optimizer, resume_from, device)
-
     #dataloader
     loader = get_rsicd_dataloader(
         root=cfg["data"]["rsicd_root"],
@@ -75,10 +71,24 @@ def train_phase2(
         num_workers=cfg["data"]["num_workers"]
     )
 
+    #ressume
+    start_epoch=0
+    if resume_from:
+        start_epoch,_ = load_checkpoint(model, optimizer, resume_from, device)
+        
+    global_step = start_epoch * len(loader)  # derive from epoch after loader is built
+
+    #scaler for mixed precision
+    scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
+
     #trainingloop
     print(f"\nPhase 2 — Projector alignment")
     print(f"Epochs: {p2['epochs']}  |  Batch: {p2['batch_size']}  |  LR: {p2['lr']}")
-    print(f"Dataset size: {len(loader)} samples\n")
+    print(f"Dataset size: {len(loader.dataset)} samples\n")
+    
+    save_steps = 1000 # Save checkpoint every 1000 batches
+    print_steps = 100 # Print progress every 100 batches
+    
     avg_loss=0.0
     for epoch in range(start_epoch, p2["epochs"]):
         model.train()
@@ -103,20 +113,43 @@ def train_phase2(
 
             #labels-> input_ids (causla lm loss)
             labels=input_ids.clone()
-            outputs=model(
-                images=images,
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                gsd = gsd,
-                labels=labels
-            )
-            loss=outputs.loss
+            labels[attention_mask == 0] = -100  # ignore padding in loss
+            
+            with torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda", dtype=torch.float16):
+                outputs=model(
+                    images=images,
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    gsd = gsd,
+                    labels=labels
+                )
+                loss=outputs.loss
+            
             optimizer.zero_grad()
-            loss.backward()
+            scaler.scale(loss).backward()
+            
+            # Unscale before clipping
+            scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(filter(lambda p :p.requires_grad, model.parameters()), max_norm=1.0)
+            
+            scaler.step(optimizer)
+            scaler.update()
+            
             epoch_loss += loss.item()
             num_batches += 1
-            optimizer.step()
+            global_step += 1
+            
+            if global_step % print_steps == 0:
+                print(f"  Epoch {epoch+1} | Step {global_step} | Loss: {loss.item():.4f} | LR: {scheduler.get_last_lr()[0]:.2e}")
+                
+            if global_step % save_steps == 0:
+                save_checkpoint(
+                    model, optimizer, epoch + 1, epoch_loss/num_batches,
+                    p2["checkpoint_dir"],
+                    filename=f"model_step{global_step}.pt"
+                )
+                print(f"  [Checkpoint saved at step {global_step}]")
+
         scheduler.step()
         avg_loss=epoch_loss/num_batches
 
@@ -124,12 +157,12 @@ def train_phase2(
               f"Loss: {avg_loss:.4f}  "
               f"LR: {scheduler.get_last_lr()[0]:.2e}")
 
-        if (epoch + 1) % p2["save_every"] == 0:
-            save_checkpoint(
-                model, optimizer, epoch + 1, avg_loss,
-                p2["checkpoint_dir"],
-                filename=f"model_epoch{epoch+1:03d}.pt"
-            )
+        # Still save at end of epoch just in case
+        save_checkpoint(
+            model, optimizer, epoch + 1, avg_loss,
+            p2["checkpoint_dir"],
+            filename=f"model_epoch{epoch+1:03d}.pt"
+        )
 
     save_checkpoint(
         model, optimizer, p2["epochs"], avg_loss,
@@ -151,7 +184,7 @@ if __name__ == "__main__":
     model.unfreeze_projector()
 
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Trainable params: {trainable:,}  (projector only)")
+    print(f"Trainable params: {trainable:,}  (projector + GSD adapter)")
 
     # Dummy batch
     images = torch.randn(2, 3, 224, 224).to(device)
