@@ -34,6 +34,18 @@ def save_checkpoint(
     }, path)
 
     print(f"Checkpoint saved: {path}")
+
+    # --- Disk Cleanup to prevent 'No space left on device' (Kaggle 20GB limit) ---
+    import glob
+    if "step" in filename:
+        step_ckpts = sorted(glob.glob(os.path.join(checkpoint_dir, "*_step*.pt")))
+        while len(step_ckpts) > 1:  # Keep only the latest 1 step checkpoint
+            os.remove(step_ckpts.pop(0))
+    elif "epoch" in filename:
+        epoch_ckpts = sorted(glob.glob(os.path.join(checkpoint_dir, "*_epoch*.pt")))
+        while len(epoch_ckpts) > 1:  # Keep only the latest 1 epoch checkpoint
+            os.remove(epoch_ckpts.pop(0))
+            
     return path
 
 
