@@ -51,7 +51,7 @@ phase3:
   batch_size: 4           # 16 OOMs on T4
   lr: 2e-4
   weight_decay: 0.01
-  max_length: 64
+  max_length: 128
   warmup_epochs: 2
   save_every: 2
   checkpoint_dir: "/content/drive/MyDrive/rs_vlm/checkpoints/phase3"
