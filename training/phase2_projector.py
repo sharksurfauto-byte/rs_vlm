@@ -102,7 +102,7 @@ def train_phase2(
 
             encoded=model.tokenizer(
                 captions,
-                return_tensors="pt",  # fixed: was return_tensor (missing s) — would crash on .to(device)
+                return_tensors="pt",
                 padding=True,
                 truncation=True,
                 max_length=64,

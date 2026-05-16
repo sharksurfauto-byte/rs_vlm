@@ -126,7 +126,24 @@ class EuroSATVQADataset(Dataset):
             item["input_ids"] = encoded["input_ids"].squeeze(0)
             item["attention_mask"] = encoded["attention_mask"].squeeze(0)
             # Labels = input_ids (causal LM — predict next token)
-            item["labels"] = encoded["input_ids"].squeeze(0).clone()
+            labels = encoded["input_ids"].squeeze(0).clone()
+            
+            # Mask out padding tokens
+            labels[item["attention_mask"] == 0] = -100
+            
+            # Mask out the user question (instruction tuning objective)
+            # We only want the model to learn to generate the answer.
+            prompt_no_answer = format_prompt(qa["question"], answer=None)
+            encoded_no_answer = self.tokenizer(
+                prompt_no_answer,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            )
+            prompt_len = encoded_no_answer["input_ids"].shape[1]
+            labels[:prompt_len] = -100
+            
+            item["labels"] = labels
 
         return item
 

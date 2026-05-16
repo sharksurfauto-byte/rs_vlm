@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyTorch checkpoints and large model files
+*.pt
+*.pth
+*.bin
+*.ckpt
+training/checkpoints/
+checkpoints/
+
+# Virtual environments
+venv/
+env/
+rs_vlm_env/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary images
+inference/test_images/
+temp_upload.jpg
