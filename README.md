@@ -59,6 +59,8 @@ Training a VLM from scratch requires a highly orchestrated, computationally inte
 
 ## Inference & Quickstart
 
+> **Note on Model Weights:** Due to GitHub's file size limits, the trained `model_phase3_final.pt` (~2GB) is not included in the repository. You can download the pre-trained weights from the "Output" tab of the [Phase 3 Training Kaggle Notebook here](https://www.kaggle.com/code/aliasgharjjawadwala/rs-vlm-training-phase3) and place them in the `training/checkpoints/` directory before running the scripts below.
+
 To run the model locally, you can use the provided Streamlit web app or the CLI inference script.
 
 ### Using the CLI
