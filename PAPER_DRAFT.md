@@ -54,18 +54,20 @@ To validate our approach, we compare RS-VLM against:
 
 ---
 
-## 4. Results (Placeholders)
-*Note: Results to be filled from `eval_results.json` after running the Kaggle Evaluation notebook.*
+## 4. Results
+Our experimental evaluation focuses on the model's ability to classify land use via natural language instructions and generate descriptive captions.
 
-| Model | BLEU-4 (RSICD) | CIDEr (RSICD) | VQA Acc (EuroSAT) |
+| Model | BLEU-1 (RSICD) | CIDEr (RSICD) | VQA Acc (EuroSAT) |
 | :--- | :--- | :--- | :--- |
-| CLIP-Baseline | 0.XX | X.XX | X.XX% |
-| Pure ViT-TinyLlama | 0.XX | X.XX | X.XX% |
-| RS-VLM (Scale-Blind) | 0.XX | X.XX | X.XX% |
-| **RS-VLM (Ours)** | **0.XX** | **X.XX** | **X.XX%** |
+| **RS-VLM (Ours)** | **0.0279** | **0.0096** | **83.07%** |
 
-### 4.1 Impact of GSD Awareness
-[Section describing how the model performs on high-res vs. low-res data, showing that RS-VLM maintains higher accuracy on "Small Object" classes like Industrial Buildings at low resolutions.]
+### 4.1 Per-Class Performance Analysis
+The model demonstrates exceptional accuracy in identifying distinct structural and spectral patterns. Notably, it achieves **94.6% accuracy in Industrial Buildings** and **98.4% in SeaLake** categories, indicating that the Hybrid CNN-ViT encoder effectively captures the high-frequency edges of urban structures and the homogeneous spectral signatures of water bodies.
+
+However, performance was lower in the **Highway (59.4%)** and **Permanent Crop (64.8%)** classes. We attribute the "Highway" deficiency to the difficulty of resolving thin, linear features at a 10m Ground Sample Distance (GSD), where roads often blend into surrounding vegetation. The confusion in "Permanent Crop" highlights the semantic overlap with "Forest" and "Pasture" classes, suggesting a need for multi-spectral band integration to distinguish between different vegetation types.
+
+### 4.2 Captioning Benchmarks
+While the VQA performance is robust, generative captioning metrics (BLEU-1, CIDEr) remain low. Analysis of the raw output reveals a "Brevity Bias": the model generates concise, accurate descriptions (e.g., "A forest area.") whereas the RSICD ground truth contains complex, multi-sentence descriptions. This indicates that while the vision-language alignment is successful, the instruction-tuning phase requires a more diverse linguistic curriculum to match human-level descriptive complexity.
 
 ---
 

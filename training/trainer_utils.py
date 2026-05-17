@@ -26,9 +26,12 @@ def save_checkpoint(
 
     path = os.path.join(checkpoint_dir, filename)
 
+    # Handle DataParallel
+    model_to_save = model.module if hasattr(model, "module") else model
+
     torch.save({
         "epoch": epoch,
-        "model_state_dict": model.state_dict(),
+        "model_state_dict": model_to_save.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "loss": loss,
     }, path)
@@ -57,7 +60,11 @@ def load_checkpoint(
 ) -> tuple[int, float]:
     """Load checkpoint — returns (epoch, loss)."""
     ckpt = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(ckpt["model_state_dict"])
+    
+    # Handle DataParallel
+    model_to_load = model.module if hasattr(model, "module") else model
+    model_to_load.load_state_dict(ckpt["model_state_dict"])
+    
     if optimizer is not None:
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
     print(f"Loaded checkpoint: {checkpoint_path} (epoch {ckpt['epoch']})")
@@ -69,8 +76,11 @@ def get_device() -> torch.device:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     if device.type == "cuda":
-        print(f"  GPU: {torch.cuda.get_device_name(0)}")
-        print(f"  Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        num_gpus = torch.cuda.device_count()
+        print(f"  Available GPUs: {num_gpus}")
+        for i in range(num_gpus):
+            print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
+            print(f"    Memory: {torch.cuda.get_device_properties(i).total_memory / 1e9:.1f} GB")
     return device
 
 

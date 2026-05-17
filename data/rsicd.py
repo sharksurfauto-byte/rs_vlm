@@ -97,6 +97,74 @@ class RSICDDataset(Dataset):
         }
 
 
+class RSICDInstructionDataset(Dataset):
+    """
+    Wraps RSICDDataset and converts captions to instruction-style prompts.
+    Used for Phase 3 instruction tuning.
+    """
+
+    def __init__(
+        self,
+        root: str = "data/RSICD",
+        train: bool = True,
+        tokenizer=None,
+        max_length: int = 128,
+    ):
+        self.base_dataset = RSICDDataset(root=root, train=train)
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+
+    def __len__(self):
+        return len(self.base_dataset)
+
+    def __getitem__(self, idx):
+        sample = self.base_dataset[idx]
+        image = sample["image"]
+        caption = sample["caption"]
+        gsd = sample["gsd"]
+
+        # Format as instruction
+        question = "Describe this satellite image in detail."
+        prompt = f"<|user|>\n{question}</s>\n<|assistant|>\n{caption}</s>"
+
+        item = {
+            "image": image,
+            "gsd": gsd,
+            "question": question,
+            "answer": caption,
+            "prompt": prompt,
+        }
+
+        if self.tokenizer is not None:
+            encoded = self.tokenizer(
+                prompt,
+                max_length=self.max_length,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+            )
+            item["input_ids"] = encoded["input_ids"].squeeze(0)
+            item["attention_mask"] = encoded["attention_mask"].squeeze(0)
+            
+            labels = encoded["input_ids"].squeeze(0).clone()
+            labels[item["attention_mask"] == 0] = -100
+            
+            # Mask out user prompt
+            prompt_no_answer = f"<|user|>\n{question}</s>\n<|assistant|>\n"
+            encoded_no_answer = self.tokenizer(
+                prompt_no_answer,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+            )
+            prompt_len = encoded_no_answer["input_ids"].shape[1]
+            labels[:prompt_len] = -100
+            
+            item["labels"] = labels
+
+        return item
+
+
 def get_rsicd_dataloader(
     root: str = "data/RSICD",
     train: bool = True,

@@ -5,7 +5,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from model.rs_vlm import RSVLM
 from data.vqa_templates import EuroSATVQADataset
-from torch.utils.data import DataLoader
+from data.rsicd import RSICDInstructionDataset
+from torch.utils.data import DataLoader, ConcatDataset
 from training.trainer_utils import(
     load_config, save_checkpoint, load_checkpoint, get_device, get_warmup_scheduler
 )
@@ -68,10 +69,17 @@ def train_phase3(
     model.freeze_encoder_expect_gsd()
     model.unfreeze_projector()
 
+    # Multi-GPU Support
+    if torch.cuda.device_count() > 1:
+        print(f"Using {torch.cuda.device_count()} GPUs with DataParallel")
+        model = torch.nn.DataParallel(model)
+
     #PEFT automatically keeps only lora params trainable in the llm
     # we verify this by confirming the trainiable params count
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total = sum(p.numel() for p in model.parameters())
+    # Note: access .module if wrapped in DataParallel
+    model_internal = model.module if hasattr(model, "module") else model
+    trainable = sum(p.numel() for p in model_internal.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in model_internal.parameters())
     print(f"Trainable params: {trainable:,} / {total:,} "
           f"({100 * trainable / total:.2f}%) — projector + GSD adapter + LoRA")
     
@@ -87,12 +95,23 @@ def train_phase3(
     )
 
     #data loader
-    dataset=EuroSATVQADataset(
+    eurosat_dataset=EuroSATVQADataset(
         eurosat_root=cfg["data"]['eurosat_root'],
         train=True,
-        tokenizer=model.tokenizer,
+        tokenizer=model_internal.tokenizer,
         max_length=p3['max_length'],
     )
+    
+    rsicd_dataset=RSICDInstructionDataset(
+        root=cfg["data"]['rsicd_root'],
+        train=True,
+        tokenizer=model_internal.tokenizer,
+        max_length=p3['max_length'],
+    )
+    
+    # Mix datasets (ConcatDataset interleaves them if shuffled)
+    dataset = ConcatDataset([eurosat_dataset, rsicd_dataset])
+    
     loader=DataLoader(
         dataset,
         batch_size=p3['batch_size'],
@@ -121,7 +140,11 @@ def train_phase3(
     avg_loss=0.0
     for epoch in range(start_epoch, p3['epochs']):
         model.train()
-        model.encoder.eval() #encoder stays in eval
+        # Ensure encoder stays in eval (access via .module if DP)
+        if hasattr(model, "module"):
+            model.module.encoder.eval()
+        else:
+            model.encoder.eval()
 
         epoch_loss=0.0
         num_batches=0
@@ -147,6 +170,9 @@ def train_phase3(
                     labels=labels,
                 )
                 loss = outputs.loss
+                # If using DataParallel, loss might be a vector of losses per GPU
+                if loss.dim() > 0:
+                    loss = loss.mean()
 
             optimizer.zero_grad()
             scaler.scale(loss).backward()

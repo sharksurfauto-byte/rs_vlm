@@ -81,9 +81,10 @@ def chat_with_image(model: RSVLM, image_path: str, question: str, gsd: float = 1
             outputs = model.llm.generate(
                 inputs_embeds=inputs_embeds,
                 attention_mask=full_mask,
-                max_new_tokens=32,
-                temperature=0.2, # Low temperature for factual VQA
-                do_sample=False,
+                max_new_tokens=64,
+                temperature=0.7, # Low temperature for factual VQA
+                do_sample=True,
+                top_p=0.9,
                 pad_token_id=model.tokenizer.pad_token_id,
                 eos_token_id=model.tokenizer.eos_token_id,
             )
@@ -97,7 +98,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # UPDATE THIS PATH AFTER DOWNLOADING
-    CHECKPOINT = "training\checkpoints\model_phase3_final.pt"
+    CHECKPOINT = r"training\checkpoints\model_phase3_final.pt"
     
     if not os.path.exists(CHECKPOINT):
         print(f"Error: Could not find checkpoint at {CHECKPOINT}")
@@ -105,7 +106,7 @@ if __name__ == "__main__":
         
     model = load_vlm(CHECKPOINT, device)
     
-    TEST_PATH = r"inference\test_images"  
+    TEST_PATH = r"inference\test_folder"  
     
     if os.path.isdir(TEST_PATH):
         print(f"\n--- Batch Testing images in {TEST_PATH} ---")
@@ -116,14 +117,14 @@ if __name__ == "__main__":
                 chat_with_image(
                     model, 
                     image_path=img_path, 
-                    question="What type of land use is shown in this satellite image?",
+                    question="Describe this satellite image.",
                     gsd=10.0
                 )
     elif os.path.exists(TEST_PATH):
         chat_with_image(
             model, 
             image_path=TEST_PATH, 
-            question="What type of land use is shown in this satellite image?",
+            question="Describe this satellite image.",
             gsd=10.0
         )
     else:
