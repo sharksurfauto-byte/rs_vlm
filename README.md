@@ -1,7 +1,8 @@
 # RS-VLM: Remote Sensing Vision-Language Model
 
 ## Overview
-![RS-VLM Demo](image.png)
+<img width="1361" height="672" alt="image" src="https://github.com/user-attachments/assets/fed8c736-0179-4902-9f06-afc4a6cb9cf7" />
+
 
 RS-VLM is a custom-built, end-to-end Vision-Language Model designed specifically for remote sensing and satellite imagery analysis. Unlike standard VLMs (like LLaVA or GPT-4V) which are trained on natural photography, RS-VLM features a specialized hybrid architecture and is trained from scratch to understand the unique spatial, textural, and scale properties of satellite data.
 
