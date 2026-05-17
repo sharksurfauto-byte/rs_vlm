@@ -126,10 +126,16 @@ class RSICDInstructionDataset(Dataset):
         # Format as instruction
         question = "Describe this satellite image in detail."
         prompt = f"<|user|>\n{question}</s>\n<|assistant|>\n{caption}</s>"
+        
+        turns = [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": caption}
+        ]
 
         item = {
             "image": image,
             "gsd": gsd,
+            "turns": turns,
             "question": question,
             "answer": caption,
             "prompt": prompt,
